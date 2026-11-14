@@ -96,6 +96,10 @@ func TestCertificateVerification(t *testing.T) {
 		})
 	}
 
+	pinnedKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	pinnedCert := generateCertWithKey(t, pinnedKey, now, now.Add(14*24*time.Hour))
+
 	for _, tc := range [...]struct {
 		name   string
 		certs  [][]byte
@@ -117,6 +121,14 @@ func TestCertificateVerification(t *testing.T) {
 			name:   "hash mismatch",
 			certs:  [][]byte{generateCertWithKey(t, ecdsaKey, now, now.Add(15*24*time.Hour)).Raw},
 			hashes: []multihash.DecodedMultihash{sha256Multihash(t, []byte("foobar"))},
+			errStr: "cert hash not found",
+		},
+		{
+			// The certhash must pin the leaf (rawCerts[0]), whose key signs the
+			// handshake, not some other certificate appended to the chain.
+			name:   "certhash only matches a non-leaf certificate in the chain",
+			certs:  [][]byte{generateCertWithKey(t, ecdsaKey, now, now.Add(time.Hour)).Raw, pinnedCert.Raw},
+			hashes: []multihash.DecodedMultihash{sha256Multihash(t, pinnedCert.Raw)},
 			errStr: "cert hash not found",
 		},
 	} {

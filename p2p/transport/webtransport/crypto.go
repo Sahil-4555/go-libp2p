@@ -108,7 +108,9 @@ func verifyRawCerts(rawCerts [][]byte, certHashes []multihash.DecodedMultihash) 
 	if len(rawCerts) < 1 {
 		return errors.New("no cert")
 	}
-	leaf := rawCerts[len(rawCerts)-1]
+	// rawCerts[0] is the leaf whose key authenticates the TLS handshake; later
+	// chain entries are attacker-controllable, so the hash must pin the leaf.
+	leaf := rawCerts[0]
 	// The W3C WebTransport specification currently only allows SHA-256 certificates for serverCertificateHashes.
 	hash := sha256.Sum256(leaf)
 	var verified bool
