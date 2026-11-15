@@ -183,6 +183,11 @@ func (l *listener) httpHandler(w http.ResponseWriter, r *http.Request) {
 		// This is better than failing so that users that don't use quicreuse.ConnContext option with the resource
 		// manager still work correctly.
 	}
+	// A scope taken from the request context belongs to the QUIC connection:
+	// it is shared by every request on that connection (including an already
+	// established libp2p connection) and is released when the QUIC connection
+	// closes. Only release scopes opened here for this request.
+	ownScope := false
 	if connScope == nil {
 		connScope, err = l.transport.rcmgr.OpenConnection(network.DirInbound, false, remoteMultiaddr)
 		if err != nil {
@@ -190,9 +195,10 @@ func (l *listener) httpHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		ownScope = true
 	}
 	err = l.httpHandlerWithConnScope(w, r, connScope)
-	if err != nil {
+	if err != nil && ownScope {
 		connScope.Done()
 	}
 }
